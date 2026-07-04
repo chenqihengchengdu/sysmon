@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sysmon — Linux 终端系统资源监控工具</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: "Microsoft YaHei","PingFang SC",sans-serif; background:#0d1117; color:#c9d1d9; line-height:1.8; padding:40px 20px; }
+  .container { max-width:960px; margin:0 auto; }
+  h1 { font-size:2em; color:#58a6ff; border-bottom:2px solid #30363d; padding-bottom:10px; margin-bottom:10px; }
+  h2 { font-size:1.5em; color:#f0f6fc; margin:36px 0 12px; padding-left:12px; border-left:4px solid #58a6ff; }
+  h3 { font-size:1.15em; color:#d2a8ff; margin:20px 0 8px; }
+  p, li { margin:6px 0; }
+  a { color:#58a6ff; }
+  pre { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:14px 18px; overflow-x:auto; margin:10px 0; font-size:0.9em; }
+  code { font-family:"Cascadia Code","Fira Code","Consolas",monospace; font-size:0.92em; }
+  pre.term { background:#0c0c0c; color:#e0e0e0; border:1px solid #333; }
+  pre.term .blue { color:#58a6ff; }
+  pre.term .red { color:#f78166; }
+  pre.term .cyan { color:#56d4dd; }
+  pre.term .dim { color:#6e7681; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; }
+  th, td { border:1px solid #30363d; padding:8px 14px; text-align:left; }
+  th { background:#161b22; color:#f0f6fc; }
+  tr:hover { background:#161b22; }
+  .badge { display:inline-block; background:#238636; color:#fff; border-radius:4px; padding:2px 8px; font-size:0.82em; margin-right:6px; }
+  .badge.gray { background:#30363d; }
+  .badge.blue { background:#1f6feb; }
+  .note { background:#161b22; border-left:4px solid #d29922; border-radius:0 6px 6px 0; padding:12px 18px; margin:12px 0; }
+  .note.tip { border-left-color:#58a6ff; }
+  .toc { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:16px 24px; margin:20px 0; columns:2; }
+  .toc a { display:block; padding:3px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>sysmon</h1>
+<p>Linux 终端下的 <strong>系统资源监控工具</strong>，按用户聚合 CPU 和内存使用。</p>
+<p>
+  <span class="badge blue">pip install --user</span>
+  <span class="badge gray">无需 sudo</span>
+  <span class="badge gray">纯 Python</span>
+</p>
+
+<div class="toc">
+  <a href="#install">1. 安装</a>
+  <a href="#record">2. 自动记录</a>
+  <a href="#live">3. 实时柱状图</a>
+  <a href="#user">4. 单人详情</a>
+  <a href="#review">5. 复盘检测</a>
+  <a href="#history">6. 7 天走势</a>
+  <a href="#commands">7. 命令速查</a>
+  <a href="#trouble">8. 常见问题</a>
+</div>
+
+<!-- ============ INSTALL ============ -->
+<h2 id="install">1. 安装</h2>
+
+<pre><code># 一行安装，无需 sudo
+pip install --user git+https://github.com/chenqihengchengdu/sysmon.git</code></pre>
+
+<p>如果安装后提示 <code>sysmon: command not found</code>，把 <code>~/.local/bin</code> 加入 PATH：</p>
+
+<pre><code>echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc</code></pre>
+
+<p>要求：Python 3.9+、<code>psutil</code>（自动安装）。仅读取 <code>/proc</code>，不需要 root。</p>
+
+<!-- ============ RECORD ============ -->
+<h2 id="record">2. 自动记录</h2>
+
+<p>历史趋势和复盘分析依赖定时记录。添加一条 cron 任务，每 5 分钟记录一次：</p>
+
+<pre><code>*/5 * * * * /path/to/sysmon --record</code></pre>
+
+<p>数据存储在 <code>~/.local/share/sysmon/sysmon.db</code> (SQLite)，关机不丢失。</p>
+
+<div class="note tip">
+  没有历史数据的话，走势图和复盘功能无法使用。建议安装完立刻加上 cron。
+</div>
+
+<!-- ============ LIVE ============ -->
+<h2 id="live">3. 实时柱状图</h2>
+
+<p><code>sysmon</code> 默认显示前 5 个用户的内存（蓝色）和 CPU（红色）实时使用情况：</p>
+
+<pre class="term">
+=========================== Resource Usage (by user) ===========================
+User                    MEM                      CPU
+<span class="blue">user1       ██████████████████████   █████████████████</span>          40.4%  10.6%
+root                                                             0.1%   0.1%
+gdm                                                              0.1%   0.0%
+<span class="red">user2       █</span>                                                    0.5%  50.1%
+user3                                                            0.0%   0.0%
+
+  5 users | Total MEM: 41.1% | Total CPU: 60.7%
+</pre>
+
+<table>
+  <tr><th>命令</th><th>效果</th></tr>
+  <tr><td><code>sysmon</code></td><td>实时柱状图，前 5 个用户</td></tr>
+  <tr><td><code>sysmon --all</code></td><td>显示所有用户（包括零占用的）</td></tr>
+  <tr><td><code>sysmon --user &lt;name&gt;</code></td><td>进入单人详情模式</td></tr>
+</table>
+
+<!-- ============ USER ============ -->
+<h2 id="user">4. 单人详情</h2>
+
+<p><code>sysmon --user user1</code> 显示该用户最近 7 天的 CPU（红色）和内存（蓝色）双线走势图：</p>
+
+<pre class="term">
+=========================== user1 — Last 7 Days CPU/MEM ===========================
+  Current: CPU 3.2% | MEM 39.7%  (299.4 GB)
+
+   46% │
+       │<span class="blue">█ █</span>
+   37% │<span class="blue">      █  █   █  █   █  █   █  █</span>
+       │
+   27% │
+       │<span class="red">▓ ▓   ▓</span>
+   18% │<span class="red">         ▓   ▓  ▓</span>
+       │<span class="red">                    ▓  ▓   ▓</span>
+    9% │<span class="red">                               ▓  ▓   ▓</span>
+       │
+    0% │
+       └────────────────────────────────────
+        07-02    07-02     07-02     07-02
+
+    <span class="blue">█ MEM</span>    <span class="red">▓ CPU</span>
+</pre>
+
+<p>内存泄漏还是 CPU 飙升？一张图全看清。</p>
+
+<!-- ============ REVIEW ============ -->
+<h2 id="review">5. 复盘检测 — 找出资源波动元凶</h2>
+
+<h3>核心功能</h3>
+
+<p><code>sysmon --review</code> 扫描指定时间窗口内 <strong>所有用户、所有记录</strong>，找出 <strong>单次间隔内增长最快</strong> 的用户。</p>
+<p>谁从空闲突然飙到 100% CPU？谁在 5 分钟内吃掉 10 GB 内存？一目了然。</p>
+
+<pre class="term">
+============================ Review — Peak MEM Spike (last 12h) =============================
+User                         Peak Spike (MEM%)
+user1   ██████████████████████████████████████████████    12.4%  (14:35)
+user2   ██████████████                                   3.1%  (09:10)
+user3   ████                                            1.2%  (16:50)
+</pre>
+
+<table>
+  <tr><th>使用场景</th><th>命令</th></tr>
+  <tr><td>怀疑有人内存泄漏</td><td><code>sysmon -review</code></td></tr>
+  <tr><td>怀疑有人 CPU 飙高</td><td><code>sysmon -review --cpu</code></td></tr>
+  <tr><td>只看最近 3 小时</td><td><code>sysmon -review --hour 3</code></td></tr>
+  <tr><td>只看最近 1 小时</td><td><code>sysmon -review --hour 1</code></td></tr>
+</table>
+
+<div class="note">
+  <strong>为什么这个功能重要？</strong> 多用户服务器上，一个人的失控任务可能耗尽资源，影响所有人。
+  <code>sysmon -review</code> 能在用户抱怨之前告诉你 <strong>谁爆发了、爆发了多少、什么时间</strong>。
+</div>
+
+<!-- ============ HISTORY ============ -->
+<h2 id="history">6. 7 天历史走势</h2>
+
+<p><code>sysmon --history</code> 展示前 5 个用户最近一周的内存使用趋势。加上 <code>--cpu</code> 查看 CPU 趋势。每个用户用不同符号区分。</p>
+
+<pre class="term">
+  ── Last 7 days — Memory Usage ──
+
+   49% │
+   41% │<span class="blue">█████████████           █████████████</span>
+   33% │<span class="blue">             ███████████             ███████████</span>
+   25% │
+    0% │<span class="red">▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓</span>
+       └─────────────────────────────────────────
+        06-25       06-27       06-29       07-01
+
+    █ user1   ▓ user2   ● user3   ◆ root   ▲ user4
+</pre>
+
+<!-- ============ ALERT ============ -->
+<h2 id="alert">6.5 内存报警</h2>
+
+<p>设置阈值后，每分钟自动检查剩余内存。超标时通过 <code>wall</code> 弹窗通知所有在线用户，报警一次后自动停止。</p>
+
+<pre><code>sysmon -alert start 50G        # 剩余内存低于 50GB 报警
+sysmon -alert start 20%        # 剩余内存低于 20% 报警
+sysmon -alert start 50G --row 5  # 报警时 wall 重复 5 行（默认 9 行）
+sysmon -alert stat              # 查看当前报警配置
+sysmon -alert stop              # 停止报警</code></pre>
+
+<p>报警生效期间，<strong>所有 <code>sysmon</code> 命令</strong>都会在顶部显示红色 <code>!!! MEMORY LOW !!!</code> 横幅。</p>
+
+<div class="note">
+  <strong>工作机制：</strong> <code>sysmon -alert start</code> 自动写入 crontab，每分钟执行一次静默检查。
+  触发后 wall 广播、自动停止（不刷屏）。用 <code>--row N</code> 控制 wall 消息重复行数。
+</div>
+
+<!-- ============ COMMANDS ============ -->
+<h2 id="commands">7. 命令速查</h2>
+
+<table>
+  <tr><th>命令</th><th>说明</th></tr>
+  <tr><td><code>sysmon</code></td><td>实时柱状图（前 5 用户）</td></tr>
+  <tr><td><code>sysmon -all</code></td><td>实时柱状图（所有用户）</td></tr>
+  <tr><td><code>sysmon -user &lt;name&gt;</code></td><td>单人 CPU + 内存双线走势图</td></tr>
+  <tr><td><code>sysmon -history</code></td><td>最近 7 天内存走势（前 5 用户）</td></tr>
+  <tr><td><code>sysmon -history --cpu</code></td><td>最近 7 天 CPU 走势</td></tr>
+  <tr><td><code>sysmon -review</code></td><td>复盘内存波动峰值（最近 12 小时）</td></tr>
+  <tr><td><code>sysmon -review --cpu</code></td><td>复盘 CPU 波动峰值</td></tr>
+  <tr><td><code>sysmon -review --hour N</code></td><td>复盘最近 N 小时波动</td></tr>
+  <tr><td><code>sysmon -alert start 50G</code></td><td>剩余内存低于 50GB 报警</td></tr>
+  <tr><td><code>sysmon -alert start 20%</code></td><td>剩余内存低于 20% 报警</td></tr>
+  <tr><td><code>sysmon -alert start 50G --row 5</code></td><td>报警时 wall 重复 5 行</td></tr>
+  <tr><td><code>sysmon -alert stat</code></td><td>查看报警配置</td></tr>
+  <tr><td><code>sysmon -alert stop</code></td><td>停止报警</td></tr>
+  <tr><td><code>sysmon -record</code></td><td>记录一次快照（供 cron 调用）</td></tr>
+  <tr><td><code>sysmon --help</code></td><td>完整帮助信息</td></tr>
+</table>
+
+<!-- ============ TROUBLESHOOTING ============ -->
+<h2 id="trouble">8. 常见问题</h2>
+
+<h3>Q: 安装后 sysmon 命令找不到？</h3>
+<p><code>pip install --user</code> 把脚本装在 <code>~/.local/bin</code>，该目录可能不在 PATH 中：</p>
+<pre><code>echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc</code></pre>
+
+<h3>Q: 走势图 / 复盘没有数据？</h3>
+<p>需要先配置自动记录（cron）并等待数据积累。每 5 分钟一条，至少需要几条才能画图。</p>
+
+<h3>Q: 某个用户内存占用特别大（几百 GB）正常吗？</h3>
+<p><code>sysmon</code> 统计的是 <strong>RSS（物理内存）</strong>，不区分共享页。如果用户跑了大量并行任务或 fork 的子进程，汇总值可能较大。这个值反映的是"该用户进程总共占据的物理内存"。可结合 <code>free -h</code> 对比系统总内存。</p>
+
+<h3>Q: CPU 超过 100% 是什么意思？</h3>
+<p>已归一化到 0-100%（除以 CPU 核心数）。如果看到接近 100%，说明该用户几乎占满了所有核心。</p>
+
+<hr style="border-color:#30363d; margin:30px 0;">
+
+<p style="text-align:center; color:#6e7681; font-size:0.9em;">
+  sysmon v0.2.0 · MIT License ·
+  <a href="https://github.com/chenqihengchengdu/sysmon">GitHub</a>
+</p>
+
+</div>
+</body>
+</html>
